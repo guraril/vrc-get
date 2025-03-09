@@ -8,6 +8,8 @@ pub struct GuiConfig {
     #[serde(default)]
     pub gui_hidden_repositories: IndexSet<String>,
     #[serde(default)]
+    pub gui_hidden_packages: IndexSet<String>,
+    #[serde(default)]
     pub hide_local_user_packages: bool,
     #[serde(default)]
     pub window_size: WindowSize,
@@ -51,6 +53,7 @@ impl Default for GuiConfig {
     fn default() -> Self {
         GuiConfig {
             gui_hidden_repositories: IndexSet::new(),
+            gui_hidden_packages: IndexSet::new(),
             hide_local_user_packages: false,
             window_size: WindowSize::default(),
             fullscreen: false,

@@ -324,7 +324,7 @@ export const PackageListCard = memo(function PackageListCard({
 						</tr>
 					</thead>
 					<tbody>
-						{packageRowsData.map((row) => (
+						{packageRowsData.filter((value) => !value.hidden).map((row) => (
 							<tr
 								className="even:bg-secondary/30"
 								hidden={!filteredPackageIds.has(row.id)}

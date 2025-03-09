@@ -33,6 +33,12 @@ pub struct TauriPackage {
 }
 
 #[derive(Serialize, specta::Type)]
+pub struct TauriPackagesInfo {
+    packages: Vec<TauriPackage>,
+    hidden_packages: Vec<String>,
+}
+
+#[derive(Serialize, specta::Type)]
 enum TauriPackageSource {
     LocalUser,
     Remote { id: String, display_name: String },
@@ -75,6 +81,7 @@ pub async fn environment_refetch_packages(
     Ok(())
 }
 
+// this function is no longer used
 #[tauri::command]
 #[specta::specta]
 pub async fn environment_packages(
@@ -93,6 +100,48 @@ pub async fn environment_packages(
         .enumerate()
         .map(|(index, value)| TauriPackage::new(version, index, value))
         .collect::<Vec<_>>())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn environment_packages_info(
+    packages: State<'_, PackagesState>,
+    settings: State<'_, SettingsState>,
+    config: State<'_, GuiConfigState>,
+    io: State<'_, DefaultEnvironmentIo>,
+    http: State<'_, reqwest::Client>,
+) -> Result<TauriPackagesInfo, RustError> {
+    let config = config.get();
+    let hidden_packages = config.gui_hidden_packages.iter().cloned().collect();
+    let packages = environment_packages(packages, settings, io, http).await?;
+    Ok(TauriPackagesInfo {
+        packages,
+        hidden_packages,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn environment_hide_package(
+    config: State<'_, GuiConfigState>,
+    package_name: String,
+) -> Result<(), RustError> {
+    let mut config = config.load_mut().await?;
+    config.gui_hidden_packages.insert(package_name);
+    config.save().await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn environment_show_package(
+    config: State<'_, GuiConfigState>,
+    package_name: String,
+) -> Result<(), RustError> {
+    let mut config = config.load_mut().await?;
+    config.gui_hidden_packages.shift_remove(&package_name);
+    config.save().await?;
+    Ok(())
 }
 
 #[derive(Serialize, specta::Type)]

@@ -101,8 +101,8 @@ function PageBody() {
 					refetchOnWindowFocus: false,
 				},
 				{
-					queryKey: ["environmentPackages"],
-					queryFn: commands.environmentPackages,
+					queryKey: ["environmentPackagesInfo"],
+					queryFn: commands.environmentPackagesInfo,
 					refetchOnWindowFocus: false,
 				},
 				{
@@ -120,7 +120,8 @@ function PageBody() {
 	const [manualRefetching, setManualRefething] = useState<boolean>(false);
 
 	const packageRowsData = useMemo(() => {
-		const packages = packagesResult.data ?? [];
+		const packages = packagesResult.data?.packages ?? [];
+		const hiddenPackages = packagesResult.data?.hidden_packages ?? [];
 		const details = detailsResult.data ?? null;
 		const hiddenRepositories =
 			repositoriesInfo.data?.hidden_user_repositories ?? [];
@@ -133,6 +134,7 @@ function PageBody() {
 			packages,
 			details,
 			hiddenRepositories,
+			hiddenPackages,
 			hideUserPackages,
 			definedRepositories,
 			showPrereleasePackages,
@@ -753,9 +755,9 @@ function ProjectButton({
 	const [openLaunchOptions, setOpenLaunchOptions] = useState<
 		| false
 		| {
-				initialArgs: null | string[];
-				defaultArgs: string[];
-		  }
+			initialArgs: null | string[];
+			defaultArgs: string[];
+		}
 	>(false);
 
 	const onChangeLaunchOptions = async () => {

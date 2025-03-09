@@ -28,6 +28,7 @@ import { Route as MainSettingsLicensesIndexImport } from './../app/_main/setting
 import { Route as MainProjectsManageIndexImport } from './../app/_main/projects/manage/index'
 import { Route as MainPackagesUserPackagesIndexImport } from './../app/_main/packages/user-packages/index'
 import { Route as MainPackagesRepositoriesIndexImport } from './../app/_main/packages/repositories/index'
+import { Route as MainPackagesPackagesIndexImport } from './../app/_main/packages/packages/index'
 
 // Create/Update Routes
 
@@ -136,6 +137,12 @@ const MainPackagesRepositoriesIndexRoute =
     getParentRoute: () => MainRouteRoute,
   } as any)
 
+const MainPackagesPackagesIndexRoute = MainPackagesPackagesIndexImport.update({
+  id: '/packages/packages/',
+  path: '/packages/packages/',
+  getParentRoute: () => MainRouteRoute,
+} as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -187,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof MainSettingsIndexImport
+      parentRoute: typeof MainRouteImport
+    }
+    '/_main/packages/packages/': {
+      id: '/_main/packages/packages/'
+      path: '/packages/packages'
+      fullPath: '/packages/packages'
+      preLoaderRoute: typeof MainPackagesPackagesIndexImport
       parentRoute: typeof MainRouteImport
     }
     '/_main/packages/repositories/': {
@@ -269,6 +283,7 @@ interface MainRouteRouteChildren {
   MainLogIndexRoute: typeof MainLogIndexRoute
   MainProjectsIndexRoute: typeof MainProjectsIndexRoute
   MainSettingsIndexRoute: typeof MainSettingsIndexRoute
+  MainPackagesPackagesIndexRoute: typeof MainPackagesPackagesIndexRoute
   MainPackagesRepositoriesIndexRoute: typeof MainPackagesRepositoriesIndexRoute
   MainPackagesUserPackagesIndexRoute: typeof MainPackagesUserPackagesIndexRoute
   MainProjectsManageIndexRoute: typeof MainProjectsManageIndexRoute
@@ -280,6 +295,7 @@ const MainRouteRouteChildren: MainRouteRouteChildren = {
   MainLogIndexRoute: MainLogIndexRoute,
   MainProjectsIndexRoute: MainProjectsIndexRoute,
   MainSettingsIndexRoute: MainSettingsIndexRoute,
+  MainPackagesPackagesIndexRoute: MainPackagesPackagesIndexRoute,
   MainPackagesRepositoriesIndexRoute: MainPackagesRepositoriesIndexRoute,
   MainPackagesUserPackagesIndexRoute: MainPackagesUserPackagesIndexRoute,
   MainProjectsManageIndexRoute: MainProjectsManageIndexRoute,
@@ -319,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/log': typeof MainLogIndexRoute
   '/projects': typeof MainProjectsIndexRoute
   '/settings': typeof MainSettingsIndexRoute
+  '/packages/packages': typeof MainPackagesPackagesIndexRoute
   '/packages/repositories': typeof MainPackagesRepositoriesIndexRoute
   '/packages/user-packages': typeof MainPackagesUserPackagesIndexRoute
   '/projects/manage': typeof MainProjectsManageIndexRoute
@@ -338,6 +355,7 @@ export interface FileRoutesByTo {
   '/log': typeof MainLogIndexRoute
   '/projects': typeof MainProjectsIndexRoute
   '/settings': typeof MainSettingsIndexRoute
+  '/packages/packages': typeof MainPackagesPackagesIndexRoute
   '/packages/repositories': typeof MainPackagesRepositoriesIndexRoute
   '/packages/user-packages': typeof MainPackagesUserPackagesIndexRoute
   '/projects/manage': typeof MainProjectsManageIndexRoute
@@ -359,6 +377,7 @@ export interface FileRoutesById {
   '/_main/log/': typeof MainLogIndexRoute
   '/_main/projects/': typeof MainProjectsIndexRoute
   '/_main/settings/': typeof MainSettingsIndexRoute
+  '/_main/packages/packages/': typeof MainPackagesPackagesIndexRoute
   '/_main/packages/repositories/': typeof MainPackagesRepositoriesIndexRoute
   '/_main/packages/user-packages/': typeof MainPackagesUserPackagesIndexRoute
   '/_main/projects/manage/': typeof MainProjectsManageIndexRoute
@@ -380,6 +399,7 @@ export interface FileRouteTypes {
     | '/log'
     | '/projects'
     | '/settings'
+    | '/packages/packages'
     | '/packages/repositories'
     | '/packages/user-packages'
     | '/projects/manage'
@@ -398,6 +418,7 @@ export interface FileRouteTypes {
     | '/log'
     | '/projects'
     | '/settings'
+    | '/packages/packages'
     | '/packages/repositories'
     | '/packages/user-packages'
     | '/projects/manage'
@@ -417,6 +438,7 @@ export interface FileRouteTypes {
     | '/_main/log/'
     | '/_main/projects/'
     | '/_main/settings/'
+    | '/_main/packages/packages/'
     | '/_main/packages/repositories/'
     | '/_main/packages/user-packages/'
     | '/_main/projects/manage/'
@@ -467,6 +489,7 @@ export const routeTree = rootRoute
         "/_main/log/",
         "/_main/projects/",
         "/_main/settings/",
+        "/_main/packages/packages/",
         "/_main/packages/repositories/",
         "/_main/packages/user-packages/",
         "/_main/projects/manage/",
@@ -498,6 +521,10 @@ export const routeTree = rootRoute
     },
     "/_main/settings/": {
       "filePath": "_main/settings/index.tsx",
+      "parent": "/_main"
+    },
+    "/_main/packages/packages/": {
+      "filePath": "_main/packages/packages/index.tsx",
       "parent": "/_main"
     },
     "/_main/packages/repositories/": {
