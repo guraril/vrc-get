@@ -1,16 +1,20 @@
 // noinspection ExceptionCaughtLocallyJS
 
+import { applyChangesMutation } from "@/app/_main/projects/manage/-use-package-change";
+import { Route } from "@/app/_main/projects/manage/index";
 import { ScrollableCardTable } from "@/components/ScrollableCardTable";
 import { SearchBox } from "@/components/SearchBox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
 	DropdownMenu,
+	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Select,
 	SelectContent,
@@ -27,16 +31,17 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { assertNever } from "@/lib/assert-never";
-import type {
-	TauriPackage,
-	TauriPendingProjectChanges,
-	TauriRepositoriesInfo,
-} from "@/lib/bindings";
+import type { TauriPackage, TauriRepositoriesInfo } from "@/lib/bindings";
 import { commands } from "@/lib/bindings";
 import { isFindKey, useDocumentEvent } from "@/lib/events";
 import { tc, tt } from "@/lib/i18n";
-import { toastError, toastThrownError } from "@/lib/toast";
+import { toastThrownError } from "@/lib/toast";
 import { toVersionString } from "@/lib/version";
+import {
+	queryOptions,
+	useMutation,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	CircleArrowUp,
 	CircleMinus,
@@ -56,35 +61,37 @@ import {
 	CheckboxDisabledIfLoading,
 	usePageContext,
 } from "./-page-context";
-import type { RequestedOperation } from "./-use-package-change";
+
+const environmentRepositoriesInfo = queryOptions({
+	queryKey: ["environmentRepositoriesInfo"],
+	queryFn: commands.environmentRepositoriesInfo,
+});
 
 export const PackageListCard = memo(function PackageListCard({
-	projectPath,
-	createChanges,
 	packageRowsData,
 	repositoriesInfo,
 	onRefresh,
-	onRefreshRepositories,
 }: {
-	projectPath: string;
-	createChanges: (
-		operation: RequestedOperation,
-		create: Promise<TauriPendingProjectChanges>,
-	) => void;
 	packageRowsData: PackageRowInfo[];
 	repositoriesInfo: TauriRepositoriesInfo | undefined;
 	onRefresh: () => void;
-	onRefreshRepositories: () => void;
 }) {
 	const [search, setSearch] = useState("");
-	const [bulkUpdatePackageIds, setBulkUpdatePackageIds] = useState<
-		[id: string, mode: PackageBulkUpdateMode][]
-	>([]);
-	const bulkUpdateMode = useMemo(
-		() =>
-			updateModeFromPackageModes(bulkUpdatePackageIds.map(([_, mode]) => mode)),
-		[bulkUpdatePackageIds],
+	const [bulkUpdatePackageIds, setBulkUpdatePackageIds] = useState<string[]>(
+		[],
 	);
+	const bulkUpdateMode = useMemo(() => {
+		const packageRowByPackageId = new Map(
+			packageRowsData.map((row) => [row.id, row]),
+		);
+		return updateModeFromPackageModes(
+			bulkUpdatePackageIds.map((id) => {
+				const data = packageRowByPackageId.get(id);
+				if (data == null) throw new Error(`bad id: ${id}`);
+				return bulkUpdateModeForPackage(data);
+			}),
+		);
+	}, [bulkUpdatePackageIds, packageRowsData]);
 
 	const filteredPackageIds = useMemo(() => {
 		if (search === "") return new Set<string>(packageRowsData.map((x) => x.id));
@@ -114,156 +121,14 @@ export const PackageListCard = memo(function PackageListCard({
 		setBulkUpdatePackageIds([]);
 	}, [packageRowsData]);
 
-	const onInstallRequested = useCallback(
-		(pkg: TauriPackage, hasUnityIncompatibleLatest?: boolean) => {
-			createChanges(
-				{
-					type: "install",
-					pkg,
-					hasUnityIncompatibleLatest,
-				},
-				commands.projectInstallPackages(projectPath, pkg.env_version, [
-					pkg.index,
-				]),
-			);
-		},
-		[projectPath, createChanges],
-	);
-
-	const onUpgradeAllRequest = useCallback(
-		(stable: boolean) => {
-			const latestKey = stable ? "stableLatest" : "latest";
-			try {
-				const packages: number[] = [];
-				let envVersion: number | undefined = undefined;
-				let hasUnityIncompatibleLatest = false;
-				for (const packageRow of packageRowsData) {
-					const latestInfo = packageRow[latestKey];
-					if (latestInfo.status === "upgradable") {
-						if (envVersion == null) envVersion = latestInfo.pkg.env_version;
-						else if (envVersion !== latestInfo.pkg.env_version)
-							throw new Error("Inconsistent env_version");
-						packages.push(latestInfo.pkg.index);
-						hasUnityIncompatibleLatest ||=
-							latestInfo.hasUnityIncompatibleLatest;
-					}
-				}
-				if (envVersion == null) {
-					toastError(tt("projects:manage:toast:no upgradable"));
-					return;
-				}
-				createChanges(
-					{
-						type: "upgradeAll",
-						hasUnityIncompatibleLatest,
-					},
-					commands.projectInstallPackages(projectPath, envVersion, packages),
-				);
-			} catch (e) {
-				console.error(e);
-				toastThrownError(e);
-			}
-		},
-		[createChanges, projectPath, packageRowsData],
-	);
-
-	const onReinstallRequest = useCallback(
-		() =>
-			createChanges(
-				{ type: "reinstallAll" },
-				commands.projectResolve(projectPath),
-			),
-		[createChanges, projectPath],
-	);
-
-	const onRemoveRequested = useCallback(
-		async (pkg: PackageRowInfo) =>
-			createChanges(
-				{ type: "remove", displayName: pkg.displayName },
-				commands.projectRemovePackages(projectPath, [pkg.id]),
-			),
-		[createChanges, projectPath],
-	);
-
-	const onInstallOrUpgradeBulkRequested = useCallback(
-		(stable: boolean) => {
-			const latestKey = stable ? "stableLatest" : "latest";
-			try {
-				const packageIds = new Set(bulkUpdatePackageIds.map(([id, _]) => id));
-				const packages: number[] = [];
-				let envVersion: number | undefined = undefined;
-				let hasUnityIncompatibleLatest = false;
-				for (const packageRow of packageRowsData) {
-					if (packageIds.has(packageRow.id)) {
-						const latestInfo = packageRow[latestKey];
-						if (
-							latestInfo.status !== "contains" &&
-							latestInfo.status !== "upgradable"
-						)
-							throw new Error("Package is not installable");
-
-						if (envVersion == null) envVersion = latestInfo.pkg.env_version;
-						else if (envVersion !== latestInfo.pkg.env_version)
-							throw new Error("Inconsistent env_version");
-
-						packages.push(latestInfo.pkg.index);
-						hasUnityIncompatibleLatest ||=
-							latestInfo.hasUnityIncompatibleLatest;
-					}
-				}
-				if (envVersion == null) {
-					toastError(tt("projects:manage:toast:no upgradable"));
-					return;
-				}
-				createChanges(
-					{ type: "bulkInstalled", hasUnityIncompatibleLatest },
-					commands.projectInstallPackages(projectPath, envVersion, packages),
-				);
-			} catch (e) {
-				console.error(e);
-				toastThrownError(e);
-			}
-		},
-		[bulkUpdatePackageIds, createChanges, packageRowsData, projectPath],
-	);
-
-	const onBulkReinstallRequested = useCallback(() => {
-		try {
-			createChanges(
-				{ type: "bulkReinstalled" },
-				commands.projectReinstallPackages(
-					projectPath,
-					bulkUpdatePackageIds.map(([id, _]) => id),
-				),
-			);
-		} catch (e) {
-			console.error(e);
-			toastThrownError(e);
-		}
-	}, [bulkUpdatePackageIds, createChanges, projectPath]);
-
-	const onRemoveBulkRequested = useCallback(() => {
-		createChanges(
-			{ type: "bulkRemoved" },
-			commands.projectRemovePackages(
-				projectPath,
-				bulkUpdatePackageIds.map(([id, _]) => id),
-			),
-		);
-	}, [bulkUpdatePackageIds, createChanges, projectPath]);
-
 	const addBulkUpdatePackage = useCallback((row: PackageRowInfo) => {
-		const possibleUpdate: PackageBulkUpdateMode = bulkUpdateModeForPackage(row);
-
-		if (!hasAnyUpdate(possibleUpdate)) return;
 		setBulkUpdatePackageIds((prev) => {
-			if (prev.some(([id, _]) => id === row.id)) return prev;
-			return [...prev, [row.id, possibleUpdate]];
+			return prev.some((id) => id === row.id) ? prev : [...prev, row.id];
 		});
 	}, []);
 
 	const removeBulkUpdatePackage = useCallback((row: PackageRowInfo) => {
-		setBulkUpdatePackageIds((prev) => prev.filter(([id, _]) => id !== row.id));
+		setBulkUpdatePackageIds((prev) => prev.filter((id) => id !== row.id));
 	}, []);
 
 	const dialogForState: React.ReactNode = null;
@@ -283,18 +148,13 @@ export const PackageListCard = memo(function PackageListCard({
 					hiddenUserRepositories={hiddenUserRepositories}
 					repositoriesInfo={repositoriesInfo}
 					onRefresh={onRefresh}
-					onRefreshRepositories={onRefreshRepositories}
-					onUpgradeAllRequest={onUpgradeAllRequest}
-					onReinstallRequest={onReinstallRequest}
 					search={search}
 					setSearch={setSearch}
 				/>
 				<BulkUpdateCard
 					bulkUpdateMode={bulkUpdateMode}
-					bulkRemoveAll={onRemoveBulkRequested}
-					bulkInstallOrUpgradeAll={onInstallOrUpgradeBulkRequested}
-					bulkReinstallAll={onBulkReinstallRequested}
-					count={bulkUpdatePackageIds.length}
+					bulkUpdatePackageIds={bulkUpdatePackageIds}
+					packageRowsData={packageRowsData}
 					cancel={() => setBulkUpdatePackageIds([])}
 				/>
 				<ScrollableCardTable className={"h-full"}>
@@ -332,10 +192,8 @@ export const PackageListCard = memo(function PackageListCard({
 							>
 								<PackageRow
 									pkg={row}
-									onInstallRequested={onInstallRequested}
-									onRemoveRequested={onRemoveRequested}
 									bulkUpdateSelected={bulkUpdatePackageIds.some(
-										([id, _]) => id === row.id,
+										(id) => id === row.id,
 									)}
 									bulkUpdateAvailable={canBulkUpdate(
 										bulkUpdateMode,
@@ -359,9 +217,6 @@ function ManagePackagesHeading({
 	hiddenUserRepositories,
 	repositoriesInfo,
 	onRefresh,
-	onRefreshRepositories,
-	onUpgradeAllRequest,
-	onReinstallRequest,
 	search,
 	setSearch,
 }: {
@@ -369,14 +224,62 @@ function ManagePackagesHeading({
 	hiddenUserRepositories: Set<string>;
 	repositoriesInfo: TauriRepositoriesInfo | undefined;
 	onRefresh: () => void;
-	onRefreshRepositories: () => void;
-	onUpgradeAllRequest: (stable: boolean) => void;
-	onReinstallRequest: () => void;
 	search: string;
 	setSearch: (value: string) => void;
 }) {
 	const { isLoading } = usePageContext();
 
+	const queryClient = useQueryClient();
+
+	const { projectPath } = Route.useSearch();
+	const packageChange = useMutation(applyChangesMutation(projectPath));
+
+	const setShowPrereleasePackages = useMutation({
+		mutationFn: async (shown: boolean) => {
+			await commands.environmentSetShowPrereleasePackages(shown);
+		},
+		onMutate: async (shown) => {
+			await queryClient.cancelQueries(environmentRepositoriesInfo);
+			const data = queryClient.getQueryData(
+				environmentRepositoriesInfo.queryKey,
+			);
+			if (data !== undefined) {
+				queryClient.setQueryData(environmentRepositoriesInfo.queryKey, {
+					...data,
+					hide_local_user_packages: shown,
+				});
+			}
+			return data;
+		},
+		onError: (e, _, ctx) => {
+			reportError(e);
+			console.error(e);
+			queryClient.setQueryData(environmentRepositoriesInfo.queryKey, ctx);
+		},
+		onSettled: async () => {
+			await queryClient.invalidateQueries(environmentRepositoriesInfo);
+		},
+	});
+
+	const onUpgradeAllRequest = (stable: boolean) => {
+		const latestKey = stable ? "stableLatest" : "latest";
+		const packagesToInstall = packageRowsData
+			.map((row) => row[latestKey])
+			.filter<PackageLatestInfo & { status: "upgradable" }>(
+				(latest) => latest.status === "upgradable",
+			);
+		const packages: TauriPackage[] = packagesToInstall.map(
+			(latest) => latest.pkg,
+		);
+		const hasUnityIncompatibleLatest = packagesToInstall.some(
+			(latest) => latest.hasUnityIncompatibleLatest,
+		);
+		packageChange.mutate({
+			type: "upgradeAll",
+			hasUnityIncompatibleLatest,
+			packages,
+		});
+	};
 	const upgradableToLatest = packageRowsData.some(
 		(row) => row.latest.status === "upgradable",
 	);
@@ -468,7 +371,7 @@ function ManagePackagesHeading({
 				<DropdownMenuContent>
 					<DropdownMenuItem
 						className={"p-3"}
-						onClick={onReinstallRequest}
+						onClick={() => packageChange.mutate({ type: "reinstallAll" })}
 						disabled={isLoading}
 					>
 						{tc("projects:manage:button:reinstall all")}
@@ -479,38 +382,55 @@ function ManagePackagesHeading({
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button className={"shrink-0 p-3"}>
-						{tc("projects:manage:button:select repositories")}
+						{tc("projects:manage:button:package filters")}
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent className={"max-h-96 w-64"}>
-					<RepositoryMenuItem
-						hiddenUserRepositories={hiddenUserRepositories}
-						repositoryName={tt("vpm repositories:source:official")}
-						repositoryId={"com.vrchat.repos.official"}
-						refetch={onRefreshRepositories}
-					/>
-					<RepositoryMenuItem
-						hiddenUserRepositories={hiddenUserRepositories}
-						repositoryName={tt("vpm repositories:source:curated")}
-						repositoryId={"com.vrchat.repos.curated"}
-						refetch={onRefreshRepositories}
-					/>
-					<UserLocalRepositoryMenuItem
-						hideUserLocalPackages={
-							repositoriesInfo?.hide_local_user_packages ?? false
-						}
-						refetch={onRefreshRepositories}
-					/>
-					<hr className="my-3" />
-					{repositoriesInfo?.user_repositories?.map((repository) => (
+				<DropdownMenuContent
+					className={"max-h-96 w-64 overflow-y-hidden flex flex-col"}
+				>
+					<DropdownMenuLabel>
+						{tc("projects:manage:menu:repository filter")}
+					</DropdownMenuLabel>
+					<ScrollArea className={"flex flex-col"}>
 						<RepositoryMenuItem
 							hiddenUserRepositories={hiddenUserRepositories}
-							repositoryName={repository.display_name}
-							repositoryId={repository.id}
-							refetch={onRefreshRepositories}
-							key={repository.id}
+							repositoryName={tt("vpm repositories:source:official")}
+							repositoryId={"com.vrchat.repos.official"}
 						/>
-					))}
+						<RepositoryMenuItem
+							hiddenUserRepositories={hiddenUserRepositories}
+							repositoryName={tt("vpm repositories:source:curated")}
+							repositoryId={"com.vrchat.repos.curated"}
+						/>
+						<UserLocalRepositoryMenuItem
+							hideUserLocalPackages={
+								repositoriesInfo?.hide_local_user_packages ?? false
+							}
+						/>
+						<hr className="my-1.5" />
+						{repositoriesInfo?.user_repositories?.map((repository) => (
+							<RepositoryMenuItem
+								hiddenUserRepositories={hiddenUserRepositories}
+								repositoryName={repository.display_name}
+								repositoryId={repository.id}
+								key={repository.id}
+							/>
+						))}
+					</ScrollArea>
+					<DropdownMenuLabel>
+						{tc("projects:manage:menu:other filters")}
+					</DropdownMenuLabel>
+					<DropdownMenuCheckboxItem
+						checked={repositoriesInfo?.show_prerelease_packages}
+						onClick={(e) => {
+							e.preventDefault();
+							setShowPrereleasePackages.mutate(
+								!repositoriesInfo?.show_prerelease_packages,
+							);
+						}}
+					>
+						{tc("settings:show prerelease")}
+					</DropdownMenuCheckboxItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
 		</div>
@@ -599,20 +519,72 @@ function canBulkUpdate(
 
 function BulkUpdateCard({
 	bulkUpdateMode,
-	bulkRemoveAll,
-	bulkReinstallAll,
-	bulkInstallOrUpgradeAll,
-	count,
+	bulkUpdatePackageIds,
+	packageRowsData,
 	cancel,
 }: {
 	bulkUpdateMode: BulkUpdateMode;
-	bulkRemoveAll?: () => void;
-	bulkReinstallAll?: () => void;
-	bulkInstallOrUpgradeAll?: (stable: boolean) => void;
-	count: number;
+	bulkUpdatePackageIds: string[];
+	packageRowsData: PackageRowInfo[];
 	cancel?: () => void;
 }) {
 	if (!bulkUpdateMode.hasPackages) return null;
+
+	const count = bulkUpdatePackageIds.length;
+	const { projectPath } = Route.useSearch();
+	const packageChange = useMutation(applyChangesMutation(projectPath));
+
+	const bulkRemoveAll = () => {
+		packageChange.mutate({
+			type: "bulkRemoved",
+			packageIds: bulkUpdatePackageIds,
+		});
+	};
+
+	const bulkReinstallAll = () => {
+		packageChange.mutate({
+			type: "bulkReinstalled",
+			packageIds: bulkUpdatePackageIds,
+		});
+	};
+
+	const bulkInstallOrUpgradeAll = (stable: boolean) => {
+		const latestKey = stable ? "stableLatest" : "latest";
+
+		const packageRowByPackageId = new Map(
+			packageRowsData.map((r) => [r.id, r]),
+		);
+
+		let packagesToInstall: (PackageLatestInfo & {
+			status: "contains" | "upgradable";
+		})[];
+
+		try {
+			packagesToInstall = bulkUpdatePackageIds.map((id) => {
+				const data = packageRowByPackageId.get(id);
+				if (data == null) throw new Error(`bad id: ${id}`);
+				const latestInfo = data[latestKey];
+				if (latestInfo.status === "none")
+					throw new Error("Package is not installable");
+				return latestInfo;
+			});
+		} catch (e) {
+			console.error(e);
+			toastThrownError(e);
+			return;
+		}
+
+		const packages = packagesToInstall.map((info) => info.pkg);
+		const hasUnityIncompatibleLatest = packagesToInstall.some(
+			(info) => info.hasUnityIncompatibleLatest,
+		);
+
+		packageChange.mutate({
+			type: "bulkInstalled",
+			hasUnityIncompatibleLatest,
+			packages,
+		});
+	};
 
 	return (
 		<Card
@@ -657,99 +629,133 @@ function BulkUpdateCard({
 	);
 }
 
+const preventDefault = (e: Event) => e.preventDefault();
+
 function RepositoryMenuItem({
 	hiddenUserRepositories,
 	repositoryName,
 	repositoryId,
-	refetch,
 }: {
 	hiddenUserRepositories: Set<string>;
 	repositoryName: string;
 	repositoryId: string;
-	refetch: () => void;
 }) {
 	const selected = !hiddenUserRepositories.has(repositoryId);
-	const onChange = () => {
-		if (selected) {
-			commands.environmentHideRepository(repositoryId).then(refetch);
-		} else {
-			commands.environmentShowRepository(repositoryId).then(refetch);
-		}
-	};
+
+	const queryClient = useQueryClient();
+
+	const setHideRepository = useMutation({
+		mutationFn: async ({ id, shown }: { id: string; shown: boolean }) => {
+			if (shown) {
+				await commands.environmentShowRepository(id);
+			} else {
+				await commands.environmentHideRepository(id);
+			}
+		},
+		onMutate: async ({ id, shown }: { id: string; shown: boolean }) => {
+			await queryClient.cancelQueries(environmentRepositoriesInfo);
+			const data = queryClient.getQueryData(
+				environmentRepositoriesInfo.queryKey,
+			);
+			if (data !== undefined) {
+				let hidden_user_repositories: string[];
+				if (shown) {
+					if (data.hidden_user_repositories.includes(id)) {
+						hidden_user_repositories = data.hidden_user_repositories;
+					} else {
+						hidden_user_repositories = [...data.hidden_user_repositories, id];
+					}
+				} else {
+					hidden_user_repositories = data.hidden_user_repositories.filter(
+						(x) => x !== id,
+					);
+				}
+
+				queryClient.setQueryData(environmentRepositoriesInfo.queryKey, {
+					...data,
+					hidden_user_repositories,
+				});
+			}
+			return data;
+		},
+		onError: (e, _, ctx) => {
+			reportError(e);
+			console.error(e);
+			queryClient.setQueryData(environmentRepositoriesInfo.queryKey, ctx);
+		},
+		onSettled: async () => {
+			await queryClient.invalidateQueries(environmentRepositoriesInfo);
+		},
+	});
 
 	return (
-		<DropdownMenuItem
-			className="p-0"
-			onSelect={(e) => {
-				e.preventDefault();
-			}}
+		<DropdownMenuCheckboxItem
+			checked={selected}
+			onCheckedChange={(shown) =>
+				setHideRepository.mutate({ id: repositoryId, shown })
+			}
+			onSelect={preventDefault}
 		>
-			<label
-				className={
-					"flex cursor-pointer items-center gap-2 p-2 whitespace-normal"
-				}
-			>
-				<Checkbox
-					checked={selected}
-					onCheckedChange={onChange}
-					className="hover:before:content-none"
-				/>
-				{repositoryName}
-			</label>
-		</DropdownMenuItem>
+			{repositoryName}
+		</DropdownMenuCheckboxItem>
 	);
 }
 
 function UserLocalRepositoryMenuItem({
 	hideUserLocalPackages,
-	refetch,
 }: {
 	hideUserLocalPackages: boolean;
-	refetch: () => void;
 }) {
 	const selected = !hideUserLocalPackages;
-	const onChange = () => {
-		if (selected) {
-			commands.environmentSetHideLocalUserPackages(true).then(refetch);
-		} else {
-			commands.environmentSetHideLocalUserPackages(false).then(refetch);
-		}
-	};
+
+	const queryClient = useQueryClient();
+
+	const setHideLocalUserPackages = useMutation({
+		mutationFn: async (shown: boolean) => {
+			await commands.environmentSetHideLocalUserPackages(shown);
+		},
+		onMutate: async (shown) => {
+			await queryClient.cancelQueries(environmentRepositoriesInfo);
+			const data = queryClient.getQueryData(
+				environmentRepositoriesInfo.queryKey,
+			);
+			if (data !== undefined) {
+				queryClient.setQueryData(environmentRepositoriesInfo.queryKey, {
+					...data,
+					hide_local_user_packages: shown,
+				});
+			}
+			return data;
+		},
+		onError: (e, _, ctx) => {
+			reportError(e);
+			console.error(e);
+			queryClient.setQueryData(environmentRepositoriesInfo.queryKey, ctx);
+		},
+		onSettled: async () => {
+			await queryClient.invalidateQueries(environmentRepositoriesInfo);
+		},
+	});
 
 	return (
-		<DropdownMenuItem
-			className="p-0"
-			onSelect={(e) => {
-				e.preventDefault();
-			}}
+		<DropdownMenuCheckboxItem
+			checked={selected}
+			onCheckedChange={(x) => setHideLocalUserPackages.mutate(x)}
+			onSelect={preventDefault}
 		>
-			<label className={"flex cursor-pointer items-center gap-2 p-2"}>
-				<Checkbox
-					checked={selected}
-					onCheckedChange={onChange}
-					className="hover:before:content-none"
-				/>
-				{tc("vpm repositories:source:local")}
-			</label>
-		</DropdownMenuItem>
+			{tc("vpm repositories:source:local")}
+		</DropdownMenuCheckboxItem>
 	);
 }
 
 const PackageRow = memo(function PackageRow({
 	pkg,
-	onInstallRequested,
-	onRemoveRequested,
 	bulkUpdateSelected,
 	bulkUpdateAvailable,
 	addBulkUpdatePackage,
 	removeBulkUpdatePackage,
 }: {
 	pkg: PackageRowInfo;
-	onInstallRequested: (
-		pkg: TauriPackage,
-		hasUnityIncompatibleLatest?: boolean,
-	) => void;
-	onRemoveRequested: (pkgId: PackageRowInfo) => void;
 	bulkUpdateSelected: boolean;
 	bulkUpdateAvailable: boolean;
 	addBulkUpdatePackage: (pkg: PackageRowInfo) => void;
@@ -759,27 +765,26 @@ const PackageRow = memo(function PackageRow({
 	const noGrowCellClass = `${cellClass} w-1`;
 	const versionNames = [...pkg.unityCompatible.keys()];
 	const latestVersion: string | undefined = versionNames[0];
-	useCallback(
-		(version: string) => {
-			if (
-				pkg.installed != null &&
-				version === toVersionString(pkg.installed.version)
-			)
-				return;
-			const pkgVersion =
-				pkg.unityCompatible.get(version) ?? pkg.unityIncompatible.get(version);
-			if (!pkgVersion) return;
-			onInstallRequested(pkgVersion);
-		},
-		[onInstallRequested, pkg],
-	);
+
+	const { projectPath } = Route.useSearch();
+	const packageChange = useMutation(applyChangesMutation(projectPath));
+
 	const installLatest = () => {
 		if (pkg.latest.status === "none") return;
-		onInstallRequested(pkg.latest.pkg, pkg.latest.hasUnityIncompatibleLatest);
+
+		packageChange.mutate({
+			type: "install",
+			pkg: pkg.latest.pkg,
+			hasUnityIncompatibleLatest: pkg.latest.hasUnityIncompatibleLatest,
+		});
 	};
 
 	const remove = () => {
-		onRemoveRequested(pkg);
+		packageChange.mutate({
+			type: "remove",
+			displayName: pkg.displayName,
+			packageId: pkg.id,
+		});
 	};
 
 	const onClickBulkUpdate = () => {
@@ -824,16 +829,10 @@ const PackageRow = memo(function PackageRow({
 				</Tooltip>
 			</td>
 			<td className={noGrowCellClass}>
-				<PackageVersionSelector
-					pkg={pkg}
-					onInstallRequested={onInstallRequested}
-				/>
+				<PackageVersionSelector pkg={pkg} />
 			</td>
 			<td className={`${cellClass} min-w-32 w-32`}>
-				<LatestPackageInfo
-					info={pkg.latest}
-					onInstallRequested={onInstallRequested}
-				/>
+				<LatestPackageInfo info={pkg.latest} />
 			</td>
 			<td className={`${noGrowCellClass} max-w-32 overflow-hidden`}>
 				{pkg.sources.size === 0 ? (
@@ -907,30 +906,26 @@ const PackageRow = memo(function PackageRow({
 
 const PackageVersionSelector = memo(function PackageVersionSelector({
 	pkg,
-	onInstallRequested,
 }: {
 	pkg: PackageRowInfo;
-	onInstallRequested: (pkg: TauriPackage) => void;
 }) {
-	const onChange = useCallback(
-		(version: string) => {
-			if (
-				pkg.installed != null &&
-				version === toVersionString(pkg.installed.version)
-			)
-				return;
-			const pkgVersion =
-				pkg.unityCompatible.get(version) ?? pkg.unityIncompatible.get(version);
-			if (!pkgVersion) return;
-			onInstallRequested(pkgVersion);
-		},
-		[
-			onInstallRequested,
-			pkg.installed,
-			pkg.unityCompatible,
-			pkg.unityIncompatible,
-		],
-	);
+	const { projectPath } = Route.useSearch();
+	const packageChange = useMutation(applyChangesMutation(projectPath));
+
+	const onChange = (version: string) => {
+		if (
+			pkg.installed != null &&
+			version === toVersionString(pkg.installed.version)
+		)
+			return;
+		const pkgVersion =
+			pkg.unityCompatible.get(version) ?? pkg.unityIncompatible.get(version);
+		if (!pkgVersion) return;
+		packageChange.mutate({
+			type: "install",
+			pkg: pkgVersion,
+		});
+	};
 
 	const versionNames = [...pkg.unityCompatible.keys()];
 	const incompatibleNames = [...pkg.unityIncompatible.keys()];
@@ -1026,14 +1021,12 @@ function PackageInstalledInfo({
 
 function LatestPackageInfo({
 	info,
-	onInstallRequested,
 }: {
 	info: PackageLatestInfo;
-	onInstallRequested: (
-		pkg: TauriPackage,
-		hasUnityIncompatibleLatest?: boolean,
-	) => void;
 }) {
+	const { projectPath } = Route.useSearch();
+	const packageChange = useMutation(applyChangesMutation(projectPath));
+
 	switch (info.status) {
 		case "none":
 			return (
@@ -1051,7 +1044,11 @@ function LatestPackageInfo({
 								"text-left px-2 py-1 w-full h-full font-normal text-base normal-case border-success hover:border-success/70 text-success hover:text-success/70"
 							}
 							onClick={() =>
-								onInstallRequested(info.pkg, info.hasUnityIncompatibleLatest)
+								packageChange.mutate({
+									type: "install",
+									pkg: info.pkg,
+									hasUnityIncompatibleLatest: info.hasUnityIncompatibleLatest,
+								})
 							}
 						>
 							<CircleArrowUp color={"green"} className={"size-4 inline mr-2"} />

@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog].
 ### Added
 
 ### Changed
-- Changed how we read VCC's project information `#1949` `#1955`
+- Changed how we read VCC's project information `#1997` `#2036` `#2041`
   - Along with this, building this project no longer needs dotnet SDK to build.
 - Migrated the project to Rust 2024 `#1956`
   - This is internal changes should not cause behavior changes
@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog].
   - New method might have some compatibility problem, especially with some sandbox system.
   - Please report us if you find some problem with the new system.
 - Enhance os info for windows `#1968`
+- You now can select multiple folders at once to adding project `#2018`
+  - I didn't know official VCC had such a feature. Sorry for lack of feature!
+- You now can toggle "Show Prerelease Packages" from Manage Project page `#2020`
+  - You can toggle "Show Prerelease Packages" from Select Packages dropdown
 
 ### Deprecated
 
