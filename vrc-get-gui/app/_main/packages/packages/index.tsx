@@ -84,20 +84,24 @@ function PackageTableBody({
   ];
 
 
-  let newPackages = packages
-    .filter((value) => !value.is_yanked)
+  const legacyPackages = Array.from(new Set(packages.flatMap((value) => value.legacy_packages)));
+  const newPackages = packages
+    .sort((a, b) => -compareVersion(a.version, b.version))
+    .filter((value, index, self) => 
+      index === self.findIndex((t) => t.name === value.name &&
+      !legacyPackages.includes(value.name) &&
+      !value.is_yanked
+    ))
     .map((value) => {
-      let source = typeof (value.source) == 'object' ? value.source : { Remote: { id: "unknown", display_name: "Unknown" } };
-      return { name: value.name, display_name: value.display_name, source: source, version: value.version }
+      const source = value.source !== "LocalUser" ? value.source.Remote : { id: "zzz.local", display_name: "Local User Package"};
+      return { name: value.name, display_name: value.display_name, source: source!, version: value.version }
     })
-    .sort((a, b) => compareVersion(b.version, a.version))
-    .filter((value, index, self) => index === self.findIndex((t) => t.name === value.name))
     .sort((a, b) => {
-      return (a.source.Remote.id > b.source.Remote.id) ?
-        1 : (b.source.Remote.id > a.source.Remote.id) ?
-          -1 : (a.name > b.name) ?
-            1 : (b.name > a.name) ?
-              -1 : 0;
+      return   (a.source.id > b.source.id)
+        ?  1 : (a.source.id < b.source.id)
+        ? -1 : (a.name > b.name)
+        ?  1 : (a.name < b.name)
+        ? -1 : 0;
     });
 
   return (
@@ -125,7 +129,7 @@ function PackageTableBody({
               hiddenPackages={hiddenPackages}
               packageName={item.name}
               displayName={item.display_name || item.name}
-              sourceName={item.source.Remote.display_name}
+              sourceName={item.source.display_name}
               version={toVersionString(item.version)}
               refetch={refetch}
             />
