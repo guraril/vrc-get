@@ -80,6 +80,15 @@ async environmentRefetchPackages() : Promise<null> {
 async environmentPackages() : Promise<TauriPackage[]> {
     return await TAURI_INVOKE("environment_packages");
 },
+async environmentPackagesInfo() : Promise<TauriPackagesInfo> {
+    return await TAURI_INVOKE("environment_packages_info");
+},
+async environmentHidePackage(packageName: string) : Promise<null> {
+    return await TAURI_INVOKE("environment_hide_package", { packageName });
+},
+async environmentShowPackage(packageName: string) : Promise<null> {
+    return await TAURI_INVOKE("environment_show_package", { packageName });
+},
 async environmentRepositoriesInfo() : Promise<TauriRepositoriesInfo> {
     return await TAURI_INVOKE("environment_repositories_info");
 },
@@ -293,6 +302,7 @@ export type TauriImportRepositoryPickResult = { type: "NoFilePicked" } | { type:
 export type TauriPackage = ({ name: string; display_name: string | null; description: string | null; aliases: string[]; version: TauriVersion; unity: [number, number] | null; changelog_url: string | null; vpm_dependencies: string[]; legacy_packages: string[]; is_yanked: boolean }) & { env_version: number; index: number; source: TauriPackageSource }
 export type TauriPackageChange = { InstallNew: TauriBasePackageInfo } | { Remove: TauriRemoveReason }
 export type TauriPackageSource = "LocalUser" | { Remote: { id: string; display_name: string } }
+export type TauriPackagesInfo = { packages: TauriPackage[]; hidden_packages: string[] }
 export type TauriPendingProjectChanges = { changes_version: number; package_changes: ([string, TauriPackageChange])[]; remove_legacy_files: string[]; remove_legacy_folders: string[]; conflicts: ([string, TauriConflictInfo])[] }
 export type TauriPickProjectBackupPathResult = { type: "NoFolderSelected" } | { type: "InvalidSelection" } | { type: "Successful" }
 export type TauriPickProjectDefaultPathResult = { type: "NoFolderSelected" } | { type: "InvalidSelection" } | { type: "Successful"; new_path: string }

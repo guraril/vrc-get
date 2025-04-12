@@ -98,8 +98,8 @@ function PageBody() {
 					refetchOnWindowFocus: false,
 				},
 				{
-					queryKey: ["environmentPackages"],
-					queryFn: commands.environmentPackages,
+					queryKey: ["environmentPackagesInfo"],
+					queryFn: commands.environmentPackagesInfo,
 					refetchOnWindowFocus: false,
 				},
 				{
@@ -115,7 +115,8 @@ function PageBody() {
 		});
 
 	const packageRowsData = useMemo(() => {
-		const packages = packagesResult.data ?? [];
+		const packages = packagesResult.data?.packages ?? [];
+		const hiddenPackages = packagesResult.data?.hidden_packages ?? [];
 		const details = detailsResult.data ?? null;
 		const hiddenRepositories =
 			repositoriesInfo.data?.hidden_user_repositories ?? [];
@@ -128,6 +129,7 @@ function PageBody() {
 			packages,
 			details,
 			hiddenRepositories,
+			hiddenPackages,
 			hideUserPackages,
 			definedRepositories,
 			showPrereleasePackages,

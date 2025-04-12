@@ -15,18 +15,18 @@ import {
 
 export type PackageLatestInfo =
 	| {
-			status: "none";
-	  }
+		status: "none";
+	}
 	| {
-			status: "contains";
-			pkg: TauriPackage;
-			hasUnityIncompatibleLatest: boolean;
-	  }
+		status: "contains";
+		pkg: TauriPackage;
+		hasUnityIncompatibleLatest: boolean;
+	}
 	| {
-			status: "upgradable";
-			pkg: TauriPackage;
-			hasUnityIncompatibleLatest: boolean;
-	  };
+		status: "upgradable";
+		pkg: TauriPackage;
+		hasUnityIncompatibleLatest: boolean;
+	};
 
 export interface PackageRowInfo {
 	id: string;
@@ -42,6 +42,7 @@ export interface PackageRowInfo {
 		version: TauriVersion;
 		yanked: boolean;
 	};
+	hidden: boolean;
 	latest: PackageLatestInfo;
 	stableLatest: PackageLatestInfo;
 }
@@ -50,11 +51,13 @@ export function combinePackagesAndProjectDetails(
 	packages: TauriPackage[],
 	project: TauriProjectDetails | null,
 	hiddenRepositories?: string[] | null,
+	hiddenPackages?: string[] | null,
 	hideLocalUserPackages?: boolean,
 	definedRepositories: TauriUserRepository[] = [],
 	showPrereleasePackages = false,
 ): PackageRowInfo[] {
 	const hiddenRepositoriesSet = new Set(hiddenRepositories ?? []);
+	const hiddenPackagesSet = new Set(hiddenPackages ?? []);
 
 	function isUnityCompatible(
 		pkg: TauriPackage,
@@ -102,7 +105,7 @@ export function combinePackagesAndProjectDetails(
 			if (hideLocalUserPackages) continue;
 			packages = userPackages;
 		} else if ("Remote" in pkg.source) {
-			if (hiddenRepositoriesSet.has(pkg.source.Remote.id)) continue;
+			if (hiddenRepositoriesSet.has(pkg.source.Remote.id) || hiddenPackagesSet.has(pkg.name)) continue;
 
 			packages = packagesPerRepository.get(pkg.source.Remote.id) ?? [];
 			packagesPerRepository.set(pkg.source.Remote.id, packages);
@@ -131,6 +134,7 @@ export function combinePackagesAndProjectDetails(
 					sources: new Set(),
 					isThereSource: false,
 					installed: null,
+					hidden: false,
 					latest: { status: "none" },
 					stableLatest: { status: "none" },
 				}),

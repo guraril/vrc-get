@@ -1,7 +1,7 @@
 import { tc } from "@/lib/i18n";
 import { Link } from "@tanstack/react-router";
 
-type PageType = "/packages/user-packages" | "/packages/repositories";
+type PageType = "/packages/user-packages" | "/packages/repositories" | "/packages/packages";
 
 export function HeadingPageName({
 	pageType,
@@ -11,7 +11,7 @@ export function HeadingPageName({
 	return (
 		<div className={"-ml-1.5"}>
 			<div
-				className={"grid grid-cols-2 gap-1.5 bg-secondary p-1 -m-1 rounded-md"}
+				className={"grid grid-cols-3 gap-1.5 bg-secondary p-1 -m-1 rounded-md"}
 			>
 				<HeadingButton
 					currentPage={pageType}
@@ -24,6 +24,12 @@ export function HeadingPageName({
 					targetPage={"/packages/user-packages"}
 				>
 					{tc("packages:user packages")}
+				</HeadingButton>
+				<HeadingButton
+					currentPage={pageType}
+					targetPage={"/packages/packages"}
+				>
+					{tc("packages:all packages")}
 				</HeadingButton>
 			</div>
 		</div>
