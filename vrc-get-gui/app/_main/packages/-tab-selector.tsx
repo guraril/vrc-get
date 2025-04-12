@@ -29,7 +29,7 @@ export function HeadingPageName({
 					currentPage={pageType}
 					targetPage={"/packages/packages"}
 				>
-					{"Packages"}
+					{tc("packages:all packages")}
 				</HeadingButton>
 			</div>
 		</div>

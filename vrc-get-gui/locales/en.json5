@@ -358,6 +358,9 @@
     "user packages:toast:package added": "The package was added successfully.",
     "user packages:toast:package removed": "The package was removed successfully.",
 
+    "packages:all packages": "All Packages",
+    "all packages:latest": "Latest Version",
+
 
 // Settings Page
     "settings": "Settings",

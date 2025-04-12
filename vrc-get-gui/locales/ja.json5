@@ -348,6 +348,9 @@
     "user packages:toast:package added": "パッケージを登録しました。",
     "user packages:toast:package removed": "パッケージの登録を解除しました。",
 
+    "packages:all packages": "全てのパッケージ",
+    "all packages:latest": "最新バージョン",
+
 
 // Settings Page
     "settings": "設定",

@@ -80,7 +80,7 @@ function PackageTableBody({
     "", // checkbox
     "general:name",
     "general:source",
-    "user packages:version"
+    "all packages:latest"
   ];
 
 
