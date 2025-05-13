@@ -27,6 +27,7 @@ import { Route as SetupSetupAppearanceIndexImport } from './../app/_setup/setup/
 import { Route as MainSettingsLicensesIndexImport } from './../app/_main/settings/licenses/index'
 import { Route as MainProjectsManageIndexImport } from './../app/_main/projects/manage/index'
 import { Route as MainPackagesUserPackagesIndexImport } from './../app/_main/packages/user-packages/index'
+import { Route as MainPackagesTemplatesIndexImport } from './../app/_main/packages/templates/index'
 import { Route as MainPackagesRepositoriesIndexImport } from './../app/_main/packages/repositories/index'
 import { Route as MainPackagesPackagesIndexImport } from './../app/_main/packages/packages/index'
 
@@ -130,6 +131,14 @@ const MainPackagesUserPackagesIndexRoute =
     getParentRoute: () => MainRouteRoute,
   } as any)
 
+const MainPackagesTemplatesIndexRoute = MainPackagesTemplatesIndexImport.update(
+  {
+    id: '/packages/templates/',
+    path: '/packages/templates/',
+    getParentRoute: () => MainRouteRoute,
+  } as any,
+)
+
 const MainPackagesRepositoriesIndexRoute =
   MainPackagesRepositoriesIndexImport.update({
     id: '/packages/repositories/',
@@ -210,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainPackagesRepositoriesIndexImport
       parentRoute: typeof MainRouteImport
     }
+    '/_main/packages/templates/': {
+      id: '/_main/packages/templates/'
+      path: '/packages/templates'
+      fullPath: '/packages/templates'
+      preLoaderRoute: typeof MainPackagesTemplatesIndexImport
+      parentRoute: typeof MainRouteImport
+    }
     '/_main/packages/user-packages/': {
       id: '/_main/packages/user-packages/'
       path: '/packages/user-packages'
@@ -285,6 +301,7 @@ interface MainRouteRouteChildren {
   MainSettingsIndexRoute: typeof MainSettingsIndexRoute
   MainPackagesPackagesIndexRoute: typeof MainPackagesPackagesIndexRoute
   MainPackagesRepositoriesIndexRoute: typeof MainPackagesRepositoriesIndexRoute
+  MainPackagesTemplatesIndexRoute: typeof MainPackagesTemplatesIndexRoute
   MainPackagesUserPackagesIndexRoute: typeof MainPackagesUserPackagesIndexRoute
   MainProjectsManageIndexRoute: typeof MainProjectsManageIndexRoute
   MainSettingsLicensesIndexRoute: typeof MainSettingsLicensesIndexRoute
@@ -297,6 +314,7 @@ const MainRouteRouteChildren: MainRouteRouteChildren = {
   MainSettingsIndexRoute: MainSettingsIndexRoute,
   MainPackagesPackagesIndexRoute: MainPackagesPackagesIndexRoute,
   MainPackagesRepositoriesIndexRoute: MainPackagesRepositoriesIndexRoute,
+  MainPackagesTemplatesIndexRoute: MainPackagesTemplatesIndexRoute,
   MainPackagesUserPackagesIndexRoute: MainPackagesUserPackagesIndexRoute,
   MainProjectsManageIndexRoute: MainProjectsManageIndexRoute,
   MainSettingsLicensesIndexRoute: MainSettingsLicensesIndexRoute,
@@ -337,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof MainSettingsIndexRoute
   '/packages/packages': typeof MainPackagesPackagesIndexRoute
   '/packages/repositories': typeof MainPackagesRepositoriesIndexRoute
+  '/packages/templates': typeof MainPackagesTemplatesIndexRoute
   '/packages/user-packages': typeof MainPackagesUserPackagesIndexRoute
   '/projects/manage': typeof MainProjectsManageIndexRoute
   '/settings/licenses': typeof MainSettingsLicensesIndexRoute
@@ -357,6 +376,7 @@ export interface FileRoutesByTo {
   '/settings': typeof MainSettingsIndexRoute
   '/packages/packages': typeof MainPackagesPackagesIndexRoute
   '/packages/repositories': typeof MainPackagesRepositoriesIndexRoute
+  '/packages/templates': typeof MainPackagesTemplatesIndexRoute
   '/packages/user-packages': typeof MainPackagesUserPackagesIndexRoute
   '/projects/manage': typeof MainProjectsManageIndexRoute
   '/settings/licenses': typeof MainSettingsLicensesIndexRoute
@@ -379,6 +399,7 @@ export interface FileRoutesById {
   '/_main/settings/': typeof MainSettingsIndexRoute
   '/_main/packages/packages/': typeof MainPackagesPackagesIndexRoute
   '/_main/packages/repositories/': typeof MainPackagesRepositoriesIndexRoute
+  '/_main/packages/templates/': typeof MainPackagesTemplatesIndexRoute
   '/_main/packages/user-packages/': typeof MainPackagesUserPackagesIndexRoute
   '/_main/projects/manage/': typeof MainProjectsManageIndexRoute
   '/_main/settings/licenses/': typeof MainSettingsLicensesIndexRoute
@@ -401,6 +422,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/packages/packages'
     | '/packages/repositories'
+    | '/packages/templates'
     | '/packages/user-packages'
     | '/projects/manage'
     | '/settings/licenses'
@@ -420,6 +442,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/packages/packages'
     | '/packages/repositories'
+    | '/packages/templates'
     | '/packages/user-packages'
     | '/projects/manage'
     | '/settings/licenses'
@@ -440,6 +463,7 @@ export interface FileRouteTypes {
     | '/_main/settings/'
     | '/_main/packages/packages/'
     | '/_main/packages/repositories/'
+    | '/_main/packages/templates/'
     | '/_main/packages/user-packages/'
     | '/_main/projects/manage/'
     | '/_main/settings/licenses/'
@@ -491,6 +515,7 @@ export const routeTree = rootRoute
         "/_main/settings/",
         "/_main/packages/packages/",
         "/_main/packages/repositories/",
+        "/_main/packages/templates/",
         "/_main/packages/user-packages/",
         "/_main/projects/manage/",
         "/_main/settings/licenses/"
@@ -529,6 +554,10 @@ export const routeTree = rootRoute
     },
     "/_main/packages/repositories/": {
       "filePath": "_main/packages/repositories/index.tsx",
+      "parent": "/_main"
+    },
+    "/_main/packages/templates/": {
+      "filePath": "_main/packages/templates/index.tsx",
       "parent": "/_main"
     },
     "/_main/packages/user-packages/": {
