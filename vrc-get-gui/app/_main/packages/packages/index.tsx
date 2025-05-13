@@ -94,7 +94,7 @@ function PackageTableBody({
     ))
     .map((value) => {
       const source = value.source !== "LocalUser" ? value.source.Remote : { id: "zzz.local", display_name: "Local User Package"};
-      return { name: value.name, display_name: value.display_name, source: source!, version: value.version }
+      return { name: value.name, display_name: value.display_name, source: source, version: value.version }
     })
     .sort((a, b) => {
       return   (a.source.id > b.source.id)
